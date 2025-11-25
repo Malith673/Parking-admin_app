@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:parking_admin_app/application/navigation/navigation_state_notifier_provider.dart';
+import 'package:parking_admin_app/presentation/booking/booking_view.dart';
 import 'package:parking_admin_app/presentation/home/home_view.dart';
 import 'package:parking_admin_app/presentation/profile/profile_view.dart';
 
@@ -12,9 +13,9 @@ class NavigationView extends HookConsumerWidget {
 
   final List<Widget> screens = <Widget>[
     HomeView(),
-    Center(child: Text('Screen 2')),
+    BookingListPage(),
     Center(child: Text('Screen 3')),
-    ProfileView(name: 'Kamal', email: 'email', role: 'role', id: 'id'),
+    UserProfilePage(),
   ];
 
   @override
