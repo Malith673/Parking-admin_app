@@ -4,14 +4,17 @@ import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_overlay_loader/flutter_overlay_loader.dart';
+import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:parking_admin_app/application/complete_booking/complete_booking_state_notifier_provider.dart';
 import 'package:parking_admin_app/application/get_booking/get_booking_state_notifier_provider.dart';
+import 'package:parking_admin_app/application/navigation/navigation_state_notifier_provider.dart';
 import 'package:parking_admin_app/domain/complete_booking/complete_booking_response.dart';
 import 'package:parking_admin_app/domain/core/failure.dart';
 import 'package:parking_admin_app/domain/get_bookings/data.dart';
 import 'package:parking_admin_app/presentation/common/alert/alert_utils.dart';
 import 'package:parking_admin_app/presentation/common/loading_indicator.dart';
+import 'package:parking_admin_app/presentation/navigation/navigation_view.dart';
 import 'package:parking_admin_app/util/failure_extentions.dart';
 
 class BookingListPage extends HookConsumerWidget {
@@ -69,7 +72,7 @@ class BookingListPage extends HookConsumerWidget {
       ),
       (_, value) {
         value.fold(() {}, (response) {
-          showSuccessBookingPopup(context);
+          showSuccessBookingPopup(context, ref);
         });
       },
     );
@@ -266,6 +269,8 @@ class BookingListPage extends HookConsumerWidget {
                 ],
               ),
 
+              const SizedBox(height: 12),
+
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -444,7 +449,7 @@ class BookingListPage extends HookConsumerWidget {
   }
 }
 
-void showSuccessBookingPopup(BuildContext context) {
+void showSuccessBookingPopup(BuildContext context, WidgetRef ref) {
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -537,6 +542,10 @@ void showSuccessBookingPopup(BuildContext context) {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
+                          ref
+                              .read(navigationStateNotifierProvider.notifier)
+                              .indexChange(0);
+                          Get.to(() => NavigationView());
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green.shade600,

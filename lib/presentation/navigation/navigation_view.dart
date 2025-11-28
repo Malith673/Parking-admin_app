@@ -4,6 +4,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:parking_admin_app/application/navigation/navigation_state_notifier_provider.dart';
 import 'package:parking_admin_app/presentation/booking/booking_view.dart';
+import 'package:parking_admin_app/presentation/dashboard/dashboard_view.dart';
 import 'package:parking_admin_app/presentation/home/home_view.dart';
 import 'package:parking_admin_app/presentation/profile/profile_view.dart';
 
@@ -12,9 +13,15 @@ class NavigationView extends HookConsumerWidget {
   NavigationView({super.key});
 
   final List<Widget> screens = <Widget>[
-    HomeView(),
+    DashboardPage(
+      totalBookings: 10,
+      revenue: 10000,
+      totalDuration: '20',
+      todayParked: 20,
+      registeredUsers: 30,
+    ),
     BookingListPage(),
-    Center(child: Text('Screen 3')),
+    HomeView(),
     UserProfilePage(),
   ];
 
@@ -101,17 +108,17 @@ class NavigationView extends HookConsumerWidget {
                         child:
                             navIndex.index == 2
                                 ? Icon(
-                                  Iconsax.favorite_chart,
+                                  Icons.local_parking,
                                   key: ValueKey<int>(0),
-                                  color: Colors.red,
+                                  color: Colors.purple,
                                 )
                                 : const Icon(
-                                  Iconsax.favorite_chart,
+                                  Icons.local_parking,
                                   key: ValueKey<int>(1),
                                   color: Colors.white,
                                 ),
                       ),
-                      label: 'Calendar',
+                      label: 'Blocks',
                     ),
 
                     BottomNavigationBarItem(
