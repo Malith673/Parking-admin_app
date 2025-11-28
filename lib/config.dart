@@ -1,5 +1,5 @@
 mixin Config {
-  static String serverUrl = 'http://172.20.10.2:4000/';
+  static String serverUrl = 'http://192.168.1.98:4000/';
 
   static bool get printLog => true;
 

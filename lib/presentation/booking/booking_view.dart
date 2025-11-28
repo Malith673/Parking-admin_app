@@ -1,11 +1,17 @@
+import 'dart:ui';
+
 import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:flutter_overlay_loader/flutter_overlay_loader.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:parking_admin_app/application/complete_booking/complete_booking_state_notifier_provider.dart';
 import 'package:parking_admin_app/application/get_booking/get_booking_state_notifier_provider.dart';
+import 'package:parking_admin_app/domain/complete_booking/complete_booking_response.dart';
 import 'package:parking_admin_app/domain/core/failure.dart';
 import 'package:parking_admin_app/domain/get_bookings/data.dart';
 import 'package:parking_admin_app/presentation/common/alert/alert_utils.dart';
+import 'package:parking_admin_app/presentation/common/loading_indicator.dart';
 import 'package:parking_admin_app/util/failure_extentions.dart';
 
 class BookingListPage extends HookConsumerWidget {
@@ -32,12 +38,61 @@ class BookingListPage extends HookConsumerWidget {
       },
     );
 
+    ref.listen<Option<Failure>>(
+      completeBookingStateNotifierProvider.select(
+        (value) => value.responeFailure,
+      ),
+      (_, value) {
+        value.fold(() {}, (failue) {
+          AlertUtils.showErrorDialog(
+            context: context,
+            message: failue.getMessage(),
+          );
+        });
+      },
+    );
+
+    ref.listen<bool>(
+      completeBookingStateNotifierProvider.select((value) => value.isLoading),
+      (_, value) {
+        if (value) {
+          Loader.show(context, progressIndicator: const LoadingIndicator());
+        } else {
+          Loader.hide();
+        }
+      },
+    );
+
+    ref.listen<Option<CompleteBookingResponse>>(
+      completeBookingStateNotifierProvider.select(
+        (value) => value.completeBookingResponse,
+      ),
+      (_, value) {
+        value.fold(() {}, (response) {
+          showSuccessBookingPopup(context);
+        });
+      },
+    );
+
     final parkingList = ref.watch(getBookingStateNotiferProvider).bookingList;
+
+    final walkInBookings =
+        parkingList
+            .where((booking) => booking.bookingType == "WALK_IN")
+            .toList();
+
+    final onlineBookings =
+        parkingList
+            .where((booking) => booking.bookingType == "ONLINE")
+            .toList();
+
+    final searchText = useState<String>("");
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 1,
@@ -56,39 +111,121 @@ class BookingListPage extends HookConsumerWidget {
           ),
         ),
 
-        body: TabBarView(
-          children: [
-            _bookingListView(parkingList),
-            _bookingListView(parkingList),
-          ],
+        body: SafeArea(
+          child: NestedScrollView(
+            floatHeaderSlivers: false,
+
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 5),
+                    child: TextField(
+                      onChanged: (value) {
+                        searchText.value = value.trim();
+                      },
+                      decoration: InputDecoration(
+                        hintText: "Search by Booking ID",
+                        prefixIcon: Icon(Icons.search, color: Colors.blue),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ];
+            },
+
+            body: TabBarView(
+              children: [
+                /// ⛔⛔ OLD: _bookingListView()
+                /// ⭕ NEW: Use SliverFillRemaining
+                CustomScrollView(
+                  slivers: [
+                    SliverFillRemaining(
+                      hasScrollBody: true,
+                      child: _bookingListView(
+                        onlineBookings,
+                        ref,
+                        searchText.value,
+                      ),
+                    ),
+                  ],
+                ),
+
+                CustomScrollView(
+                  slivers: [
+                    SliverFillRemaining(
+                      hasScrollBody: true,
+                      child: _bookingListView(
+                        walkInBookings,
+                        ref,
+                        searchText.value,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   // ---------------- BOOKING LIST ----------------
-  Widget _bookingListView(List<Data> bookingList) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: bookingList.length,
-      itemBuilder: (context, index) {
-        print(bookingList[index].block.blockName);
-        return _bookingCard(
-          status: bookingList[index].status,
-          bookingType: bookingList[index].bookingType,
-          block: bookingList[index].block.blockName,
-          slot: bookingList[index].slot.slotNumber.toString(),
-          date: bookingList[index].date,
-          entryTime: bookingList[index].entryTime.toString(),
-          exitTime: bookingList[index].exitTime.toString(),
-          duration: "2h 15m",
-        );
-      },
+  Widget _bookingListView(
+    List<Data> bookingList,
+    WidgetRef ref,
+    String searchQuery,
+  ) {
+    final filteredList =
+        bookingList.where((booking) {
+          if (searchQuery.isEmpty) return true;
+          return booking.bookingId.toLowerCase().contains(
+            searchQuery.toLowerCase(),
+          );
+        }).toList();
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: filteredList.length,
+            itemBuilder: (context, index) {
+              final item = filteredList[index];
+              return _bookingCard(
+                bookingId: item.bookingId,
+                id: item.id,
+                status: item.status,
+                bookingType: item.bookingType,
+                block: item.block.blockName,
+                slot: item.slot.slotNumber.toString(),
+                date: item.date,
+                entryTime: item.entryTime.toString(),
+                exitTime: item.exitTime.toString(),
+                duration: "2h 15m",
+                ref: ref,
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
   // ---------------- BOOKING CARD ----------------
   Widget _bookingCard({
+    required String bookingId,
+    required String id,
     required String status,
     required String bookingType,
     required String block,
@@ -97,6 +234,7 @@ class BookingListPage extends HookConsumerWidget {
     required String entryTime,
     required String exitTime,
     required String duration,
+    required WidgetRef ref,
   }) {
     final isCompleted = status.toLowerCase() == "completed";
 
@@ -126,6 +264,32 @@ class BookingListPage extends HookConsumerWidget {
                   _chip(isCompleted ? Colors.green : Colors.orange, status),
                   _chip(Colors.blue, bookingType),
                 ],
+              ),
+
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.tag, size: 18, color: Colors.deepPurple),
+                    const SizedBox(width: 6),
+                    Text(
+                      "Booking ID: $bookingId",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.deepPurple,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 12),
@@ -185,27 +349,38 @@ class BookingListPage extends HookConsumerWidget {
                         ),
                       ],
                     ),
-                    Container(
-                      width: 100,
-                      padding: EdgeInsetsDirectional.symmetric(
-                        horizontal: 5,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: Colors.yellow,
-                      ),
-                      child: Center(
-                        child: Text(
-                          "Park Now",
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.black54,
-                            fontWeight: FontWeight.w600,
+                    status == 'CONFIRMED'
+                        ? GestureDetector(
+                          onTap: () {
+                            ref
+                                .read(
+                                  completeBookingStateNotifierProvider.notifier,
+                                )
+                                .completeBooking(id);
+                          },
+                          child: Container(
+                            width: 100,
+                            padding: EdgeInsetsDirectional.symmetric(
+                              horizontal: 5,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              color: Colors.yellow,
+                            ),
+                            child: Center(
+                              child: Text(
+                                "Complete",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black54,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
+                        )
+                        : SizedBox(),
                   ],
                 ),
               ),
@@ -267,4 +442,127 @@ class BookingListPage extends HookConsumerWidget {
       ),
     );
   }
+}
+
+void showSuccessBookingPopup(BuildContext context) {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return Stack(
+        children: [
+          // Background blur
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+            child: Container(color: Colors.black.withOpacity(0.3)),
+          ),
+
+          Center(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.7, end: 1),
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutBack,
+              builder: (context, scale, child) {
+                return Transform.scale(scale: scale, child: child);
+              },
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.78,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Circular animated success icon
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: 1),
+                      duration: const Duration(milliseconds: 500),
+                      builder: (context, value, child) {
+                        return Transform.scale(
+                          scale: value,
+                          child: Container(
+                            height: 90,
+                            width: 90,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.green.shade100,
+                            ),
+                            child: Icon(
+                              Icons.check_rounded,
+                              size: 55,
+                              color: Colors.green.shade600,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    const Text(
+                      "Booking Successful!",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    const Text(
+                      "Your booking has been completed successfully.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.black54,
+                        height: 1.4,
+                      ),
+                    ),
+
+                    const SizedBox(height: 25),
+
+                    // OK button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          "OK",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
