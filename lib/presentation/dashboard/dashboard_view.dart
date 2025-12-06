@@ -1,9 +1,15 @@
+import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:parking_admin_app/application/booking_details/booking_details_state_notifier_provider.dart';
 import 'package:parking_admin_app/application/get_registered_users/get_registered_user_state_notifier_provider.dart';
+import 'package:parking_admin_app/domain/booking_details/get_booking_details_response.dart';
+import 'package:parking_admin_app/domain/core/failure.dart';
+import 'package:parking_admin_app/presentation/common/alert/alert_utils.dart';
 import 'package:parking_admin_app/presentation/users/users_view.dart';
+import 'package:parking_admin_app/util/failure_extentions.dart';
 
 class DashboardPage extends HookConsumerWidget {
   final int totalBookings;
@@ -26,11 +32,14 @@ class DashboardPage extends HookConsumerWidget {
     useEffect(() {
       Future.microtask(() {
         ref.read(getRegisteredUsersStateNotifierProvider.notifier).getUsers();
+        ref.read(getBookingDetailsStateNotifierProvider.notifier).getDetails();
       });
       return null;
     }, []);
 
     final usersList = ref.watch(getRegisteredUsersStateNotifierProvider).data;
+    final dashoardData =
+        ref.watch(getBookingDetailsStateNotifierProvider).total;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -60,21 +69,21 @@ class DashboardPage extends HookConsumerWidget {
               children: [
                 _dashboardCard(
                   title: "Total Bookings",
-                  value: totalBookings.toString(),
+                  value: dashoardData.bookings.toString(),
                   icon: Icons.calendar_today,
                   color: Colors.blue,
                   width: MediaQuery.of(context).size.width / 2 - 24,
                 ),
                 _dashboardCard(
                   title: "Revenue",
-                  value: "Rs. ${revenue.toStringAsFixed(2)}",
+                  value: "Rs. ${dashoardData.revenue.toStringAsFixed(2)}",
                   icon: Icons.attach_money_rounded,
                   color: Colors.green,
                   width: MediaQuery.of(context).size.width / 2 - 24,
                 ),
                 _dashboardCard(
-                  title: "Today Parked",
-                  value: todayParked.toString(),
+                  title: "Today Duration",
+                  value: dashoardData.totalDuration.toString(),
                   icon: Icons.local_parking_rounded,
                   color: Colors.purple,
                   width: MediaQuery.of(context).size.width / 2 - 24,

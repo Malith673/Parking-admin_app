@@ -20,6 +20,7 @@ class NavigationView extends HookConsumerWidget {
       todayParked: 20,
       registeredUsers: 30,
     ),
+
     BookingListPage(),
     HomeView(),
     UserProfilePage(),
